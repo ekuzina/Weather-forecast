@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     database.connect()
     database.create_tables([WeatherForecast, Location])
-    db_manager = DatabaseUpdater()
+    db_manager = DatabaseManager()
 
     loc, lat, lon = db_manager.get_location()
     weather = WeatherMaker(lat, lon)
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         args = weather_console.parse_args()
 
         # Логика согласно переданным аргументам
-        
+
         if args._loc:
             print('В БД хранятся прогнозы для', db_manager.get_location_fk())
 

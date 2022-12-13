@@ -1,10 +1,7 @@
-import re
 import peewee
-
-
-database = peewee.SqliteDatabase('weather_forecast.db')
 from datetime import datetime
 
+database = peewee.SqliteDatabase('weather_forecast.db')
 
 class BaseTable(peewee.Model):
     class Meta:
@@ -90,12 +87,12 @@ class DatabaseManager():
     def prepare_range(self, _from, _to):
     ''' Формирование значений граничных дат по умолчанию ''' 
 
-        _from = DatabaseUpdater.check_date_str(_from)
+        _from = DatabaseManager.check_date_str(_from)
         if not _from:
             today = datetime.today().date()
             _from = today
 
-        _to = DatabaseUpdater.check_date_str(_to)
+        _to = DatabaseManager.check_date_str(_to)
         if not _to:
             _to = self.get_last_day()
 
