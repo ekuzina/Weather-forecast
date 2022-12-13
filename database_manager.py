@@ -11,22 +11,24 @@ class BaseTable(peewee.Model):
         database = database
 
 class Location(BaseTable):
-    location = peewee.CharField(unique = True)
-    latitude = peewee.DoubleField()
+    # автоинкрементный первичный ключи формируется автоматически
+    location  = peewee.CharField(unique = True)
+    latitude  = peewee.DoubleField()
     longitude = peewee.DoubleField()
+
+    # название таблицы формируется автоматически
 
 class WeatherForecast(BaseTable):
     date = peewee.DateField(unique = True)
     weather = peewee.CharField()
-    temperature_day = peewee.SmallIntegerField()
+    temperature_day   = peewee.SmallIntegerField()
     temperature_night = peewee.SmallIntegerField()
+    
     location = peewee.ForeignKeyField(Location, to_field='id')
 
-class DatabaseUpdater():
-    """
-    Сохраняет и выводит на консоль данные из БД.
-    Если в БД уже есть прогноз на конкретную дату - обновляет'.
-    """
+class DatabaseManager():
+    ''' Выполняет запись и чтение из БД. '''
+
     def __init__(self):
         self.hardcode_location()
 
@@ -39,13 +41,17 @@ class DatabaseUpdater():
           )
           .on_conflict_ignore()
           .execute())        
-
+    
     def get_location(self):
+    ''' Извлечение местоположения из таблицы Location '''
+
         query = Location.select().where(Location.id == 1).limit(1)
         for q in query:
             return q.location, q.latitude, q.longitude
 
     def get_location_fk(self):
+    ''' Извлечение местоположения по вторичному ключу (в учебных целях) '''
+
         query = ( Location
          .select(Location.location.alias('loc'))
          .join(WeatherForecast)
@@ -68,6 +74,8 @@ class DatabaseUpdater():
 
     @staticmethod
     def check_date_str(date):
+    ''' Проверка корректности формата даты ''' 
+
         if date:
             try:
                 date = datetime.strptime(date , "%Y-%m-%d").date()
@@ -80,6 +88,8 @@ class DatabaseUpdater():
         return WeatherForecast.select(peewee.fn.MAX(WeatherForecast.date)).scalar()
 
     def prepare_range(self, _from, _to):
+    ''' Формирование значений граничных дат по умолчанию ''' 
+
         _from = DatabaseUpdater.check_date_str(_from)
         if not _from:
             today = datetime.today().date()
@@ -94,14 +104,13 @@ class DatabaseUpdater():
 
         return _from, _to
 
-    def get(self, _from = None, _to = None):
 
+    def get(self, _from = None, _to = None):
         _from, _to = self.prepare_range(_from, _to)
         res = WeatherForecast.select().where(WeatherForecast.date.between(_from, _to))
         return res 
 
     def print(self, _from, _to=None):
-
         res = self.get(_from, _to)
         for data in res:
             print('{0}:\t{1}. Днем {2:+}*C, ночью {3:+}*C.'\

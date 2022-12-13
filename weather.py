@@ -7,6 +7,7 @@ from forecast_engine import WeatherMaker
 
 import atexit
 
+# Закрытие соединения с БД на выходе из приложения
 @atexit.register
 def goodbye():
     # print('Closing DB...')
@@ -24,6 +25,7 @@ if __name__ == '__main__':
     try:
         weather_console = argparse.ArgumentParser(description='Позволяет работать с прогнозом погоды')
         
+        # Регистрация консольных аргументов
         weather_console.add_argument(
             '--get-loc', type=bool, dest='_loc', default=False,
             help='Местоположение по внешнему ключу.'
@@ -55,8 +57,11 @@ if __name__ == '__main__':
             help='Количество архивных дней, за которые нужно вывести на консоль прогноз.'
         )
 
+        # Обработка переданных агрументов
         args = weather_console.parse_args()
 
+        # Логика согласно переданным аргументам
+        
         if args._loc:
             print('В БД хранятся прогнозы для', db_manager.get_location_fk())
 

@@ -18,6 +18,8 @@ class WeatherMaker:
 
     @staticmethod
     def forecast_parse(web_response):
+    ''' Первый этап парсинг данных с сайта '''
+
         weather_parser = BeautifulSoup(web_response, features='html.parser')
 
         list_of_days = weather_parser.find_all('time', {'class': 'time forecast-briefly__date'})
@@ -30,6 +32,8 @@ class WeatherMaker:
 
     @staticmethod
     def forecast_cleanup(day, atmospheric, day_temperature, night_temperature):
+    ''' Второй этап парсинга (очистка полученных данных)'''
+
         day = WeatherMaker.date_cleanup(day)
         atmospheric = WeatherMaker.atmospheric_cleanup(atmospheric)
         day_temperature = WeatherMaker.temperature_cleanup(day_temperature)
@@ -43,6 +47,7 @@ class WeatherMaker:
     @staticmethod
     def temperature_cleanup(temperature):
         temp = temperature.find('span', {'class': 'temp__value temp__value_with-unit'}).text
+        # Замена символа для дальнейшего преобразования типов
         temp = str(temp).replace(chr(8722), '-')
         try:
             temp = int(temp)
@@ -57,9 +62,8 @@ class WeatherMaker:
         return date_
 
     def read(self):
-        """
-        Записывает в словарь полученные данные {погода: [Облачная, ...] температура: [10, ...] дата: [datetime, ...]}
-        """
+    ''' Запись в словарь прогнозов {дата: [атм. осадки, дневная температура, ночная температура]} '''
+        
         web_response = requests.get(self.url, headers = self.headers)
 
         if web_response.status_code == 200:
@@ -85,15 +89,18 @@ class WeatherMaker:
 
     @staticmethod
     def check_date_str(date):
+    ''' Проверка корректности формата даты ''' 
+ 
         if date:
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
-                # print(date)
             except ValueError as err:
                 date = None
         return date
 
     def prepare_range(self, _from, _to):
+    ''' Формирование значений граничных дат по умолчанию ''' 
+
         _from = WeatherMaker.check_date_str(_from)
         if not _from:
             _from = self.get_first_day()
@@ -109,7 +116,6 @@ class WeatherMaker:
 
  
     def get(self, _from = None, _to = None):
-
         _from, _to = self.prepare_range(_from, _to)            
 
         for _day in self.forecast.keys():
