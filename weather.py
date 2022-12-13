@@ -1,77 +1,86 @@
-# -*- coding: utf-8 -*-
 import argparse
 import time
+from datetime import datetime, timedelta
 
-from database_manager import WeatherForecast, DatabaseUpdater, database
+from database_manager import Location, WeatherForecast, DatabaseUpdater, database
 from forecast_engine import WeatherMaker
-from paiting_cards import ImageMaker
 
+import atexit
+
+@atexit.register
+def goodbye():
+    # print('Closing DB...')
+    database.close()
 
 if __name__ == '__main__':
-    weather = WeatherMaker()
-    weather.get_weather()
-    path_to_image_with_forecast = 'python_snippets/external_data'
-    name_image_with_forecast = 'forecast.jpg'
 
-    database.create_tables([WeatherForecast])
+    database.connect()
+    database.create_tables([WeatherForecast, Location])
     db_manager = DatabaseUpdater()
 
-    for day in weather.show_weather(period=0, archive=True):
-        db_manager.save_data(data=day)
-
-    seconds_since_the_epoch = time.time()
-    # Количество секунд в четырех днях, т.к. Яндекс хранит архив пооды только за четыре дня
-    seconds_in_four_days = 345600.0000000
-    seconds_in_one_days = 86400.0000000
-    # Определяем последний доступный в архиве Яндекса день и переводим его в формат 2020-11-01
-    first_day_in_archive = time.gmtime(seconds_since_the_epoch - seconds_in_four_days)
-    last_day_in_archive = time.gmtime(seconds_since_the_epoch - seconds_in_one_days)
-    first_day_in_archive_formated = time.strftime('%Y-%m-%d', first_day_in_archive)
-    last_day_in_archive_formated = time.strftime('%Y-%m-%d', last_day_in_archive)
+    loc, lat, lon = db_manager.get_location()
+    weather = WeatherMaker(lat, lon)
 
     try:
         weather_console = argparse.ArgumentParser(description='Позволяет работать с прогнозом погоды')
+        
         weather_console.add_argument(
-            '--period', type=int, dest='period', help='Количество дней, за которые нужно сохранить прогноз в БД'
-        )
-        weather_console.add_argument(
-            '--archive', type=bool, dest='archive',
-            help='Архив погоды (True или False). Если False, то в БД не будет сохранен архив погоды за предыдущие дни.'
-        )
-        weather_console.add_argument(
-            '--from', type=str, dest='_from', help='Начальная дата, начиная с которой нужно получить прогноз из БД.'
-                                                   'Формат 2020-12-31'
-        )
-        weather_console.add_argument(
-            '--to', type=str, default=None, dest='_to',
-            help='Дата, до которой нужно получить прогноз из БД. Формат 2020-12-31 (Необязательный параметр)'
-        )
-        weather_console.add_argument(
-            '--from_print', type=str, dest='from_print', help='Дата, начиная с которой нужно вывести на консоль прогноз'
-                                                              'Формат 2020-12-31'
-        )
-        weather_console.add_argument(
-            '--to_print', type=str, default=None, dest='to_print',
-            help='Дата, до которой нужно вывести на консоль прогноз. Формат 2020-12-31 (Необязательный параметр)'
+            '--get-loc', type=bool, dest='_loc', default=False,
+            help='Местоположение по внешнему ключу.'
         )
 
-        result = weather_console.parse_args()
-        print('\nПогода в Санкт-Петербурге в последние дни:')
-        db_manager.print_data(_from=first_day_in_archive_formated, _to=last_day_in_archive_formated)
-        print('*' * 35, '\n')
+        weather_console.add_argument(
+            '--upd-from', type=str, dest='upd_from', default=None,
+            help='Дата, с которой надо обновить/дополнить сохраненный в БД прогноз.'
+                 'Формат 2020-12-31'
+        )
+        weather_console.add_argument(
+            '--upd-to', type=str, default=None, dest='upd_to',
+            help='Дата, до которой надо обновить/дополнить сохраненный в БД прогноз.'
+                 'Формат 2020-12-31'
+        )
+        weather_console.add_argument(
+            '--print-from', type=str, dest='print_from', default=None,
+            help='Дата, начиная с которой надо вывести на консоль прогноз.'
+                 'Формат 2020-12-31'
+        )
+        weather_console.add_argument(
+            '--print-to', type=str, default=None, dest='print_to',
+            help='Дата, до которой надо вывести на консоль прогноз.'
+                 'Формат 2020-12-31'
+        )
 
-        archive = weather.show_weather(period=result.period, archive=result.archive)
-        if archive:
-            for day in archive:
-                db_manager.save_data(day)
+        weather_console.add_argument(
+            '--show-prev', type=int, default=-1, dest='show_prev',
+            help='Количество архивных дней, за которые нужно вывести на консоль прогноз.'
+        )
 
-        forecasts_from_database = db_manager.get_data(_from=result._from, _to=result._to)
-        if any(forecasts_from_database):
-            for day in forecasts_from_database:
-                name_image_with_forecast = f'{day[0]}.jpg'
-                ImageMaker(weather_forecast=day, name=name_image_with_forecast).run()
+        args = weather_console.parse_args()
 
-        db_manager.print_data(_from=result.from_print, _to=result.to_print)
+        if args._loc:
+            print('В БД хранятся прогнозы для', db_manager.get_location_fk())
+
+        if args.show_prev >= 0: 
+            today = datetime.today()
+            first_archived_day = (today - timedelta(days = args.show_prev)).strftime('%Y-%m-%d')
+            today = today.strftime('%Y-%m-%d')
+
+            print(f'\nПогода над {loc} в последние дни:')
+            print('*' * 35)        
+            db_manager.print(_from=first_archived_day, _to=today)
+            print('*' * 35, '\n')        
+
+        if args.upd_from or args.upd_to:
+            weather.read()
+            for val in weather.get(_from = args.upd_from, _to = args.upd_to):
+                db_manager.save(data = val)
+                # print(val)
+
+        if args.print_from or args.print_to:
+            print(f'\nПрогноз погоды над {loc}:')
+            print('*' * 35)        
+            db_manager.print(args.print_from, args.print_to)
+            print('*' * 35, '\n')        
 
     except Exception as exc:
         print(f'Что-то пошло не так: {exc}')

@@ -1,77 +1,108 @@
 import re
-
 import peewee
 
+
 database = peewee.SqliteDatabase('weather_forecast.db')
+from datetime import datetime
 
 
 class BaseTable(peewee.Model):
     class Meta:
         database = database
 
+class Location(BaseTable):
+    location = peewee.CharField(unique = True)
+    latitude = peewee.DoubleField()
+    longitude = peewee.DoubleField()
 
 class WeatherForecast(BaseTable):
-    date = peewee.CharField()
+    date = peewee.DateField(unique = True)
     weather = peewee.CharField()
-    temperature_day = peewee.CharField()
-    temperature_night = peewee.CharField()
+    temperature_day = peewee.SmallIntegerField()
+    temperature_night = peewee.SmallIntegerField()
+    location = peewee.ForeignKeyField(Location, to_field='id')
 
-
-class DatabaseUpdater(WeatherForecast):
+class DatabaseUpdater():
     """
     Сохраняет и выводит на консоль данные из БД.
-    Если в БД уже есть прогноз на конкретную дату - не сохраняет его в БД'.
+    Если в БД уже есть прогноз на конкретную дату - обновляет'.
     """
+    def __init__(self):
+        self.hardcode_location()
 
-    def save_data(self, data):
-        if WeatherForecast.select().where(WeatherForecast.date == data[0]):
-            pass
-        else:
-            WeatherForecast.create(
-                date=data[0],
-                weather=data[1],
-                temperature_day=data[2],
-                temperature_night=data[3]
-            )
+    def hardcode_location(self):
+        result = (Location
+          .insert(
+            location = 'НИЯУ МИФИ (г. Москва)',
+            latitude = 55.6501703776999,
+            longitude = 37.66533398689662
+          )
+          .on_conflict_ignore()
+          .execute())        
 
-    def get_data(self, _from, _to=None):
-        template = r'\d{4}[-]([0][0-9]{1,2}|[1][0-2]{1,2})[-]([0-2][0-9]{1,2}|[3][0-1]{1,2})'
-        check_data = re.compile(template)
-        result = []
-        for data in WeatherForecast.select():
-            if _to is None:
-                if re.search(check_data, _from):
-                    if _from <= data.date:
-                        forecast = (data.date, data.weather, data.temperature_day, data.temperature_night)
-                        result.append(forecast)
-                else:
-                    print('Неверный формат даты. Нужно вводить ГГ-ММ-ДД: 2020-12-31')
-                    break
-            else:
-                if re.search(check_data, _from) and re.search(check_data, _to):
-                    if _from <= data.date <= _to:
-                        forecast = (data.date, data.weather, data.temperature_day, data.temperature_night)
-                        result.append(forecast)
-                else:
-                    print('Неверный формат даты. Нужно вводить ГГ-ММ-ДД: 2020-12-31')
-                    break
-        return result
+    def get_location(self):
+        query = Location.select().where(Location.id == 1).limit(1)
+        for q in query:
+            return q.location, q.latitude, q.longitude
 
-    def print_data(self, _from, _to=None):
-        template = r'\d{4}[-]([0][0-9]{1,2}|[1][0-2]{1,2})[-]([0-2][0-9]{1,2}|[3][0-1]{1,2})'
-        check_data = re.compile(template)
-        for data in WeatherForecast.select():
-            if _to is None:
-                if re.search(check_data, _from):
-                    if _from <= data.date:
-                        print(data.date, data.weather, data.temperature_day, data.temperature_night)
-                else:
-                    print('Неверный формат даты. Нужно вводить ГГ-ММ-ДД: 2020-12-31')
-                    break
-            else:
-                if re.search(check_data, _from) and re.search(check_data, _to):
-                    if _from <= data.date <= _to:
-                        print(data.date, data.weather, data.temperature_day, data.temperature_night)
-                else:
-                    print('Неверный формат даты. Нужно вводить ГГ-ММ-ДД: 2020-12-31')
-                    break
+    def get_location_fk(self):
+        query = ( Location
+         .select(Location.location.alias('loc'))
+         .join(WeatherForecast)
+         .where(WeatherForecast.location == 1).limit(1)
+        )
+        for q in query:
+            return q.loc
+
+    def save(self, data):
+        result = (WeatherForecast
+          .insert(
+            date = data[0],
+            weather = data[1][0],
+            temperature_day = data[1][1],
+            temperature_night = data[1][2],
+            location = 1
+          )
+          .on_conflict_replace()
+          .execute())
+
+    @staticmethod
+    def check_date_str(date):
+        if date:
+            try:
+                date = datetime.strptime(date , "%Y-%m-%d").date()
+            except ValueError as err:
+                date = None
+        return date
+
+
+    def get_last_day(self):
+        return WeatherForecast.select(peewee.fn.MAX(WeatherForecast.date)).scalar()
+
+    def prepare_range(self, _from, _to):
+        _from = DatabaseUpdater.check_date_str(_from)
+        if not _from:
+            today = datetime.today().date()
+            _from = today
+
+        _to = DatabaseUpdater.check_date_str(_to)
+        if not _to:
+            _to = self.get_last_day()
+
+        if _from > _to:
+            _from, _to = _to, _from
+
+        return _from, _to
+
+    def get(self, _from = None, _to = None):
+
+        _from, _to = self.prepare_range(_from, _to)
+        res = WeatherForecast.select().where(WeatherForecast.date.between(_from, _to))
+        return res 
+
+    def print(self, _from, _to=None):
+
+        res = self.get(_from, _to)
+        for data in res:
+            print('{0}:\t{1}. Днем {2:+}*C, ночью {3:+}*C.'\
+                .format(data.date.strftime('%Y-%m-%d'), data.weather, data.temperature_day, data.temperature_night))
