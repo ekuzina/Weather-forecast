@@ -1,5 +1,3 @@
-import re
-
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -16,9 +14,9 @@ class WeatherMaker:
         self.headers = {'user-agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.114 YaBrowser/22.9.1.1110 (beta) Yowser/2.5 Safari/537.36'}
         self.forecast = {}
 
+    ''' Первый этап парсинг данных с сайта '''
     @staticmethod
     def forecast_parse(web_response):
-    ''' Первый этап парсинг данных с сайта '''
 
         weather_parser = BeautifulSoup(web_response, features='html.parser')
 
@@ -30,9 +28,9 @@ class WeatherMaker:
         atmospheric_precipitation = weather_parser.find_all('div', {'class': 'forecast-briefly__condition'})
         return list_of_days, atmospheric_precipitation, day_temperature, night_temperature
 
+    ''' Второй этап парсинга (очистка полученных данных)'''
     @staticmethod
     def forecast_cleanup(day, atmospheric, day_temperature, night_temperature):
-    ''' Второй этап парсинга (очистка полученных данных)'''
 
         day = WeatherMaker.date_cleanup(day)
         atmospheric = WeatherMaker.atmospheric_cleanup(atmospheric)
@@ -61,8 +59,8 @@ class WeatherMaker:
         date_ = datetime.strptime(date_, "%Y-%m-%d").date()
         return date_
 
-    def read(self):
     ''' Запись в словарь прогнозов {дата: [атм. осадки, дневная температура, ночная температура]} '''
+    def read(self):
         
         web_response = requests.get(self.url, headers = self.headers)
 
@@ -87,9 +85,9 @@ class WeatherMaker:
     def get_location(self):
         return self.location
 
+    ''' Проверка корректности формата даты ''' 
     @staticmethod
     def check_date_str(date):
-    ''' Проверка корректности формата даты ''' 
  
         if date:
             try:
@@ -98,8 +96,8 @@ class WeatherMaker:
                 date = None
         return date
 
-    def prepare_range(self, _from, _to):
     ''' Формирование значений граничных дат по умолчанию ''' 
+    def prepare_range(self, _from, _to):
 
         _from = WeatherMaker.check_date_str(_from)
         if not _from:

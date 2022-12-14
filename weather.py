@@ -2,7 +2,7 @@ import argparse
 import time
 from datetime import datetime, timedelta
 
-from database_manager import Location, WeatherForecast, DatabaseUpdater, database
+from database_manager import Location, WeatherForecast, DatabaseManager, database
 from forecast_engine import WeatherMaker
 
 import atexit

@@ -23,8 +23,8 @@ class WeatherForecast(BaseTable):
     
     location = peewee.ForeignKeyField(Location, to_field='id')
 
+''' Выполняет запись и чтение из БД. '''
 class DatabaseManager():
-    ''' Выполняет запись и чтение из БД. '''
 
     def __init__(self):
         self.hardcode_location()
@@ -39,15 +39,15 @@ class DatabaseManager():
           .on_conflict_ignore()
           .execute())        
     
-    def get_location(self):
     ''' Извлечение местоположения из таблицы Location '''
+    def get_location(self):
 
         query = Location.select().where(Location.id == 1).limit(1)
         for q in query:
             return q.location, q.latitude, q.longitude
 
-    def get_location_fk(self):
     ''' Извлечение местоположения по вторичному ключу (в учебных целях) '''
+    def get_location_fk(self):
 
         query = ( Location
          .select(Location.location.alias('loc'))
@@ -69,9 +69,9 @@ class DatabaseManager():
           .on_conflict_replace()
           .execute())
 
+    ''' Проверка корректности формата даты ''' 
     @staticmethod
     def check_date_str(date):
-    ''' Проверка корректности формата даты ''' 
 
         if date:
             try:
@@ -84,8 +84,8 @@ class DatabaseManager():
     def get_last_day(self):
         return WeatherForecast.select(peewee.fn.MAX(WeatherForecast.date)).scalar()
 
-    def prepare_range(self, _from, _to):
     ''' Формирование значений граничных дат по умолчанию ''' 
+    def prepare_range(self, _from, _to):
 
         _from = DatabaseManager.check_date_str(_from)
         if not _from:
